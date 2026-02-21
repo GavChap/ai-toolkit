@@ -28,7 +28,7 @@ from toolkit.dequantize import patch_dequantization_on_save
 from toolkit.ip_adapter import IPAdapter
 from toolkit.util.vae import load_vae
 from toolkit import train_tools
-from toolkit.config_modules import ModelConfig, GenerateImageConfig, ModelArch
+from toolkit.config_modules import ModelConfig, GenerateImageConfig, ModelArch, SAMPLE_MODEL_PRESETS
 from toolkit.metadata import get_meta_for_safetensors
 from toolkit.models.decorator import Decorator
 from toolkit.paths import KEYMAPS_ROOT

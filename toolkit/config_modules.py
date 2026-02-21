@@ -61,6 +61,7 @@ class SampleItem:
         self.ctrl_img_1: Optional[str] = kwargs.get('ctrl_img_1', self.ctrl_img)
         self.ctrl_img_2: Optional[str] = kwargs.get('ctrl_img_2', None)
         self.ctrl_img_3: Optional[str] = kwargs.get('ctrl_img_3', None)
+        self.sample_model: Optional[str] = kwargs.get('sample_model', sample_config.sample_model)
         
         self.network_multiplier: float = kwargs.get('network_multiplier', sample_config.network_multiplier)
         # convert to a number if it is a string
@@ -94,6 +95,7 @@ class SampleConfig:
         self.extra_values = kwargs.get('extra_values', [])
         self.num_frames = kwargs.get('num_frames', 1)
         self.fps: int = kwargs.get('fps', 16)
+        self.sample_model: Optional[str] = kwargs.get('sample_model', None)
         if self.num_frames > 1 and self.ext not in ['webp']:
             print("Changing sample extention to animated webp")
             self.ext = 'webp'
@@ -566,6 +568,41 @@ class TrainConfig:
 
 
 ModelArch = Literal['sd1', 'sd2', 'sd3', 'sdxl', 'pixart', 'pixart_sigma', 'auraflow', 'flux', 'flex1', 'flex2', 'lumina2', 'vega', 'ssd', 'wan21']
+
+SAMPLE_MODEL_PRESETS = {
+    "flux-2-klein-base-9b": {
+        "arch": "flux2_klein_9b",
+        "name_or_path": "black-forest-labs/FLUX.2-klein-base-9B",
+    },
+    "flux-2-klein-base-4b": {
+        "arch": "flux2_klein_4b",
+        "name_or_path": "black-forest-labs/FLUX.2-klein-base-4B",
+    },
+    "flux-2-klein-9b": {
+        "arch": "flux2_klein_9b",
+        "name_or_path": "black-forest-labs/FLUX.2-klein-9B",
+    },
+    "flux-2-klein-4b": {
+        "arch": "flux2_klein_4b",
+        "name_or_path": "black-forest-labs/FLUX.2-klein-4B",
+    },
+    "flux-2-Klein-9B": {
+        "arch": "flux2_klein_9b",
+        "name_or_path": "black-forest-labs/FLUX.2-klein-9B",
+    },
+    "flux-2-Klein-4B": {
+        "arch": "flux2_klein_4b",
+        "name_or_path": "black-forest-labs/FLUX.2-klein-4B",
+    },
+    "z-image-turbo": {
+        "arch": "zimage",
+        "name_or_path": "Tongyi-MAI/Z-Image-Turbo",
+    },
+    "z-image": {
+        "arch": "zimage",
+        "name_or_path": "Tongyi-MAI/Z-Image",
+    },
+}
 
 
 class ModelConfig:
@@ -1046,6 +1083,7 @@ class GenerateImageConfig:
             fps: int = 15,
             ctrl_idx: int = 0,
             do_cfg_norm: bool = False,
+            sample_model: Optional[str] = None,
     ):
         self.width: int = width
         self.height: int = height
@@ -1085,6 +1123,7 @@ class GenerateImageConfig:
         self.ctrl_img_1 = ctrl_img_1
         self.ctrl_img_2 = ctrl_img_2
         self.ctrl_img_3 = ctrl_img_3
+        self.sample_model = sample_model
 
         # prompt string will override any settings above
         self._process_prompt_string()
@@ -1296,6 +1335,8 @@ class GenerateImageConfig:
                         self.ctrl_img = content
                     elif flag == 'ctrl_idx':
                         self.ctrl_idx = int(content)
+                    elif flag == 'sample_model':
+                        self.sample_model = content
 
     def post_process_embeddings(
             self,

@@ -155,7 +155,8 @@ class Flux2Model(BaseModel):
 
         transformer.load_state_dict(transformer_state_dict, assign=True)
 
-        transformer.to(self.quantize_device, dtype=dtype)
+        if not self.model_config.low_vram:
+            transformer.to(self.quantize_device, dtype=dtype)
 
         if self.model_config.quantize:
             # patch the state dict method
@@ -181,6 +182,7 @@ class Flux2Model(BaseModel):
             self.print_and_status_update("Moving transformer to CPU")
             transformer.to("cpu")
 
+        flush()
         text_encoder, tokenizer = self.load_te()
 
         self.print_and_status_update("Loading VAE")
@@ -232,12 +234,16 @@ class Flux2Model(BaseModel):
         text_encoder = [pipe.text_encoder]
         tokenizer = [pipe.tokenizer]
 
+        if not self.low_vram:  # Add this check
+            pipe.transformer = pipe.transformer.to(
+                self.device_torch)  # Pull this up from underneath `text_encoder[0].eval()`
+
         flush()
         # just to make sure everything is on the right device and dtype
         text_encoder[0].to(self.device_torch)
         text_encoder[0].requires_grad_(False)
         text_encoder[0].eval()
-        pipe.transformer = pipe.transformer.to(self.device_torch)
+
         flush()
 
         # save it to the model class

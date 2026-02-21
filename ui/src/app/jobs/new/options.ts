@@ -600,6 +600,7 @@ export const modelArchs: ModelArch[] = [
       'config.process[0].train.timestep_type': ['weighted', 'sigmoid'],
       'config.process[0].model.qtype': ['qfloat8', 'qfloat8'],
       'config.process[0].sample.sample_steps': [30, 25],
+      'config.process[0].sample.sample_model': ['z-image-turbo', undefined],
     },
     disableSections: ['network.conv'],
     additionalSections: ['model.low_vram', 'model.layer_offloading'],
@@ -673,6 +674,7 @@ export const modelArchs: ModelArch[] = [
         },
         {},
       ],
+      'config.process[0].sample.sample_model': ['flux-2-klein-4b', undefined],
     },
     disableSections: ['network.conv'],
     additionalSections: [
@@ -704,6 +706,7 @@ export const modelArchs: ModelArch[] = [
         },
         {},
       ],
+      'config.process[0].sample.sample_model': ['flux-2-klein-9b', undefined],
     },
     disableSections: ['network.conv'],
     additionalSections: [

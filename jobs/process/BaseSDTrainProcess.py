@@ -350,6 +350,7 @@ class BaseSDTrainProcess(BaseTrainProcess):
                 ctrl_img_2=sample_item.ctrl_img_2,
                 ctrl_img_3=sample_item.ctrl_img_3,
                 do_cfg_norm=sample_config.do_cfg_norm,
+                sample_model=sample_item.sample_model,
                 **extra_args
             ))
 
@@ -364,15 +365,98 @@ class BaseSDTrainProcess(BaseTrainProcess):
         if self.adapter is not None and isinstance(self.adapter, CustomAdapter):
             self.adapter.is_sampling = True
         
-        # send to be generated
-        self.sd.generate_images(gen_img_config_list, sampler=sample_config.sampler)
+        # Group configs by sample_model
+        from collections import OrderedDict
+        configs_by_model = OrderedDict()
+        for cfg in gen_img_config_list:
+            m = cfg.sample_model
+            if m not in configs_by_model:
+                configs_by_model[m] = []
+            configs_by_model[m].append(cfg)
 
+        for model_name, configs in configs_by_model.items():
+            if model_name is None:
+                # send to be generated
+                self.sd.generate_images(configs, sampler=sample_config.sampler)
+            else:
+                self._sample_with_alternative_model(model_name, configs, sampler=sample_config.sampler)
         
         if self.adapter is not None and isinstance(self.adapter, CustomAdapter):
             self.adapter.is_sampling = False
 
         if self.ema is not None:
             self.ema.train()
+
+    def _sample_with_alternative_model(self, model_input: str, configs: List[GenerateImageConfig], sampler: str):
+        from toolkit.util.get_model import get_model_class
+        from toolkit.config_modules import SAMPLE_MODEL_PRESETS
+        import copy
+        
+        # 1. Resolve preset
+        actual_model_name = model_input
+        actual_model_arch = self.model_config.arch # default to current arch
+        model_kwargs = {}
+        if model_input in SAMPLE_MODEL_PRESETS:
+            preset = SAMPLE_MODEL_PRESETS[model_input]
+            actual_model_name = preset.get('name_or_path', model_input)
+            if 'arch' in preset:
+                actual_model_arch = preset['arch']
+            # copy other fields if they exist
+            for k, v in preset.items():
+                if k not in ['name_or_path', 'arch']:
+                    model_kwargs[k] = v
+        
+        # 2. Save current state and move training model to CPU
+        self.sd.save_device_state()
+        # move all to cpu
+        self.sd.vae.to('cpu')
+        if self.sd.unet is not None:
+            self.sd.unet.to('cpu')
+        if self.sd.text_encoder is not None:
+            if isinstance(self.sd.text_encoder, list):
+                for te in self.sd.text_encoder:
+                    te.to('cpu')
+            else:
+                self.sd.text_encoder.to('cpu')
+        flush()
+        
+        # 3. Create temp config
+        tmp_model_config = copy.deepcopy(self.model_config)
+        tmp_model_config.name_or_path = actual_model_name
+        tmp_model_config.arch = actual_model_arch
+        # handle extras_name_or_path
+        tmp_model_config.extras_name_or_path = actual_model_name
+        
+        # handle presets
+        for k, v in model_kwargs.items():
+            setattr(tmp_model_config, k, v)
+        
+        # 4. Load temp model
+        ModelClass = get_model_class(tmp_model_config)
+        tmp_sd = ModelClass(
+            device=self.device,
+            model_config=tmp_model_config,
+            dtype=self.train_config.dtype,
+            custom_pipeline=self.custom_pipeline,
+        )
+        
+        # also apply current network to the alternative model if it is compatible
+        if self.network is not None:
+            # check if arches are compatible (same type)
+            if tmp_sd.arch == self.sd.arch:
+                # todo transfer LoRA? This is tricky as we need to attach it to the new unet
+                # For now let's not apply it as it might be unstable.
+                pass
+        
+        # 5. Generate
+        tmp_sd.generate_images(configs, sampler=sampler)
+        
+        # 6. Cleanup
+        del tmp_sd
+        flush()
+        
+        # 7. Restore current state
+        self.sd.restore_device_state()
 
     def update_training_metadata(self):
         o_dict = OrderedDict({

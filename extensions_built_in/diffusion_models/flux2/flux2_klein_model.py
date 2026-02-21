@@ -44,8 +44,8 @@ class Flux2KleinModel(Flux2Model):
             self.flux2_klein_te_path,
             torch_dtype=dtype,
         )
-        text_encoder.to(self.device_torch, dtype=dtype)
-
+        if not self.model_config.low_vram:
+            text_encoder.to(self.device_torch, dtype=dtype)
         flush()
 
         if self.model_config.quantize_te:
